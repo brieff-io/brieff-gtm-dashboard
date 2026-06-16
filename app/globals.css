@@ -1,0 +1,10 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: var(--canvas, #f7f8fa);
+  color: #161a23;
+  -webkit-font-smoothing: antialiased;
+}
