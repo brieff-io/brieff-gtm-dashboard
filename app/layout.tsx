@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Brieff GTM Dashboard",
   description: "Internal go-to-market dashboard.",
+  icons: { icon: "/favicon.svg" },
   // Internal tool — keep it out of search engines (access is gated by Vercel).
   robots: { index: false, follow: false },
 };
