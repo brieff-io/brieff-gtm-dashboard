@@ -1,13 +1,20 @@
+import { unstable_cache } from "next/cache";
 import { lastNDays } from "./range";
 import { getGa4Metrics } from "./ga4";
 import { getHubSpotMetrics } from "./hubspot";
 import { getStripeMetrics } from "./stripe";
 import type { DashboardData, FunnelStage } from "./types";
 
+// External data is fetched at most once per REVALIDATE_SECONDS and then served
+// from Next's data cache (see the cached export below). Opening or refreshing
+// the dashboard repeatedly will not re-hit GA4/HubSpot/Stripe. Tune for fresher
+// data vs. fewer API calls.
+const REVALIDATE_SECONDS = 600;
+
 // Fetches all three sources in parallel and assembles the cross-source GTM
 // funnel. Each fetcher fails soft (status: not_configured / error), so the
 // dashboard always renders.
-export async function getDashboardData(days = 30): Promise<DashboardData> {
+async function fetchDashboardData(days: number): Promise<DashboardData> {
   const range = lastNDays(days);
   const [ga4, hubspot, stripe] = await Promise.all([
     getGa4Metrics(range),
@@ -25,3 +32,11 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
 
   return { range, ga4, hubspot, stripe, funnel };
 }
+
+// Cached wrapper: repeated requests reuse the cached result until it goes stale,
+// capping external API usage regardless of how often the dashboard is viewed.
+export const getDashboardData = unstable_cache(
+  fetchDashboardData,
+  ["gtm-dashboard-data"],
+  { revalidate: REVALIDATE_SECONDS },
+);

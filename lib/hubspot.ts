@@ -17,6 +17,12 @@ const LIFECYCLE_STAGES = [
   "customer",
 ];
 
+// HubSpot's Search API returns at most 200 results per page and caps any single
+// query at 10,000 total results, so 50 pages * 200 fetches everything it will
+// return. This avoids silently undercounting pipeline at realistic deal volumes.
+const PAGE_SIZE = 200;
+const MAX_PAGES = 50;
+
 const EMPTY: HubSpotMetrics = {
   status: "not_configured",
   newContacts: 0,
@@ -35,7 +41,9 @@ export async function getHubSpotMetrics(
   if (!TOKEN) return EMPTY;
 
   try {
-    const client = new Client({ accessToken: TOKEN });
+    // Retry on 429/5xx with the client's built-in backoff so a transient rate
+    // limit doesn't blank the whole pipeline section.
+    const client = new Client({ accessToken: TOKEN, numberOfApiCallRetries: 3 });
     const startMs = String(new Date(`${range.start}T00:00:00Z`).getTime());
 
     const countSearch = async (
@@ -75,14 +83,14 @@ export async function getHubSpotMetrics(
     let pipelineValue = 0;
     const stageMap: Record<string, { count: number; amount: number }> = {};
     let after: string | undefined;
-    for (let page = 0; page < 5; page++) {
+    for (let page = 0; page < MAX_PAGES; page++) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const req: any = {
         filterGroups: [
           { filters: [{ propertyName: "hs_is_closed", operator: "EQ", value: "false" }] },
         ],
         properties: ["amount", "dealstage"],
-        limit: 100,
+        limit: PAGE_SIZE,
         after,
       };
       const r = await client.crm.deals.searchApi.doSearch(req);
@@ -103,7 +111,7 @@ export async function getHubSpotMetrics(
     let wonDeals = 0;
     let wonValue = 0;
     after = undefined;
-    for (let page = 0; page < 5; page++) {
+    for (let page = 0; page < MAX_PAGES; page++) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const req: any = {
         filterGroups: [
@@ -115,7 +123,7 @@ export async function getHubSpotMetrics(
           },
         ],
         properties: ["amount"],
-        limit: 100,
+        limit: PAGE_SIZE,
         after,
       };
       const r = await client.crm.deals.searchApi.doSearch(req);

@@ -4,8 +4,9 @@ import { Card, Kpi, SectionHeader } from "@/components/ui";
 import { Funnel } from "@/components/funnel";
 import { ChannelChart, SessionsChart } from "@/components/charts";
 
-// Render on each request so the numbers are always fresh (low-traffic internal
-// tool). The data fetchers cap their own work to stay within API limits.
+// The page renders per request, but external data (GA4/HubSpot/Stripe) is cached
+// in getDashboardData and refreshed at most every 10 minutes, so refreshing the
+// page repeatedly will not hammer the source APIs.
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
