@@ -19,7 +19,8 @@ each API directly (no public API keys; all secrets are server-side).
    for how to create each):
    - **GA4:** service account (Analytics Data API) with Viewer on the property;
      `GA_PROPERTY_ID` is `313410833`.
-   - **HubSpot:** Private App token (contacts + deals read).
+   - **HubSpot:** a Service Key (recommended) or legacy Private App token, with
+     read access to Contacts + Deals.
    - **Stripe:** restricted read-only secret key.
 3. `pnpm dev` → http://localhost:3000
 

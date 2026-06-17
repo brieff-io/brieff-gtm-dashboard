@@ -1,9 +1,10 @@
 import { Client } from "@hubspot/api-client";
 import type { DateRange, HubSpotMetrics } from "./types";
 
-// HubSpot CRM. Needs a Private App token (scopes: crm.objects.contacts.read,
-// crm.objects.deals.read) in env HUBSPOT_TOKEN. Uses the search API for counts
-// + deal aggregation. Search request objects are typed loosely (`any`) because
+// HubSpot CRM. Authenticates with a Bearer token in env HUBSPOT_TOKEN — use a
+// HubSpot Service Key (recommended) or a legacy Private App access token, with
+// read access to Contacts and Deals. Uses the search API for counts + deal
+// aggregation. Search request objects are typed loosely (`any`) because
 // HubSpot's operator enum is verbose; responses stay fully typed.
 
 const TOKEN = process.env.HUBSPOT_TOKEN;
