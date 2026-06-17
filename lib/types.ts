@@ -41,10 +41,11 @@ export interface HubSpotMetrics {
 export interface StripeMetrics {
   status: SourceStatus;
   error?: string;
-  mrr: number; // monthly recurring revenue, in currency units
+  mrr: number; // MRR in the PRIMARY currency (largest), in currency units
+  mrrByCurrency: { currency: string; mrr: number }[]; // all currencies, not summed
   activeSubscriptions: number;
   newCustomers: number; // created in range
-  currency: string;
+  currency: string; // primary currency code, e.g. "aud"
 }
 
 export interface FunnelStage {

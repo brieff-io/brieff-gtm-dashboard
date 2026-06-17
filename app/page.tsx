@@ -112,11 +112,18 @@ export default async function DashboardPage() {
       <section className="mb-8">
         <SectionHeader title="Revenue (Stripe)" status={stripe.status} note={stripe.status === "error" ? stripe.error : undefined} />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} />
-          <Kpi label="ARR (est.)" value={fmtCurrency(stripe.mrr * 12, stripe.currency)} />
+          <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} hint={stripe.currency.toUpperCase()} />
+          <Kpi label="ARR (est.)" value={fmtCurrency(stripe.mrr * 12, stripe.currency)} hint={stripe.currency.toUpperCase()} />
           <Kpi label="Active subscriptions" value={fmtNum(stripe.activeSubscriptions)} />
           <Kpi label="New customers" value={fmtNum(stripe.newCustomers)} hint="in range" />
         </div>
+        {stripe.mrrByCurrency.length > 1 && (
+          <p className="mt-3 text-xs text-steel">
+            MRR by currency:{" "}
+            {stripe.mrrByCurrency.map((m) => fmtCurrency(m.mrr, m.currency)).join(" · ")}.
+            Headline MRR/ARR shows {stripe.currency.toUpperCase()} only; currencies are not converted.
+          </p>
+        )}
       </section>
 
       <p className="text-xs text-steel">
