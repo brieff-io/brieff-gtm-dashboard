@@ -55,7 +55,7 @@ export default async function DashboardPage() {
           value={fmtNum(hubspot.wonDeals)}
           hint={fmtCurrency(hubspot.wonValue, stripe.currency)}
         />
-        <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} hint={`${fmtNum(stripe.activeSubscriptions)} active subs`} />
+        <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} hint={`${fmtNum(stripe.activeSubscriptions)} active subscribers`} />
         <Kpi label="New customers" value={fmtNum(stripe.newCustomers)} hint="Stripe, in range" />
       </section>
 
@@ -114,14 +114,14 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} hint={stripe.currency.toUpperCase()} />
           <Kpi label="ARR (est.)" value={fmtCurrency(stripe.mrr * 12, stripe.currency)} hint={stripe.currency.toUpperCase()} />
-          <Kpi label="Active subscriptions" value={fmtNum(stripe.activeSubscriptions)} />
+          <Kpi label="Active subscribers" value={fmtNum(stripe.activeSubscriptions)} hint="paying" />
           <Kpi label="New customers" value={fmtNum(stripe.newCustomers)} hint="in range" />
         </div>
         {stripe.mrrByCurrency.length > 1 && (
           <p className="mt-3 text-xs text-steel">
-            MRR by currency:{" "}
-            {stripe.mrrByCurrency.map((m) => fmtCurrency(m.mrr, m.currency)).join(" · ")}.
-            Headline MRR/ARR shows {stripe.currency.toUpperCase()} only; currencies are not converted.
+            Blended into {stripe.currency.toUpperCase()} from:{" "}
+            {stripe.mrrByCurrency.map((m) => fmtCurrency(m.mrr, m.currency)).join(" · ")}{" "}
+            (discounts applied, live FX).
           </p>
         )}
       </section>

@@ -41,11 +41,11 @@ export interface HubSpotMetrics {
 export interface StripeMetrics {
   status: SourceStatus;
   error?: string;
-  mrr: number; // MRR in the PRIMARY currency (largest), in currency units
-  mrrByCurrency: { currency: string; mrr: number }[]; // all currencies, not summed
-  activeSubscriptions: number;
+  mrr: number; // blended MRR in base currency (AUD): discounts + live FX applied
+  mrrByCurrency: { currency: string; mrr: number }[]; // native per-currency, discount-adjusted
+  activeSubscriptions: number; // paying subscriptions (excludes $0/free), matches Stripe
   newCustomers: number; // created in range
-  currency: string; // primary currency code, e.g. "aud"
+  currency: string; // base currency code, e.g. "aud"
 }
 
 export interface FunnelStage {
