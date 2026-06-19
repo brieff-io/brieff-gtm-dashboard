@@ -22,15 +22,19 @@ async function fetchDashboardData(days: number): Promise<DashboardData> {
     getStripeMetrics(range),
   ]);
 
+  // A stage is only "available" if its source actually returned ok. Otherwise
+  // the UI shows "—" so an errored fetch can't masquerade as a real zero.
+  const ga4Ok = ga4.status === "ok";
+  const hubspotOk = hubspot.status === "ok";
   const funnel: FunnelStage[] = [
-    { label: "Visitors", value: ga4.sessions, source: "GA4 sessions" },
-    { label: "Demo clicks", value: ga4.demoClicks, source: "GA4 demo_click" },
-    { label: "New contacts", value: hubspot.newContacts, source: "HubSpot" },
-    { label: "Deals created", value: hubspot.dealsCreated, source: "HubSpot" },
-    { label: "Customers won", value: hubspot.wonDeals, source: "HubSpot" },
+    { label: "Visitors", value: ga4.sessions, source: "GA4 sessions", available: ga4Ok },
+    { label: "Demo clicks", value: ga4.demoClicks, source: "GA4 demo_click", available: ga4Ok },
+    { label: "New contacts", value: hubspot.newContacts, source: "HubSpot", available: hubspotOk },
+    { label: "Deals created", value: hubspot.dealsCreated, source: "HubSpot", available: hubspotOk },
+    { label: "Customers won", value: hubspot.wonDeals, source: "HubSpot", available: hubspotOk },
   ];
 
-  return { range, ga4, hubspot, stripe, funnel };
+  return { range, ga4, hubspot, stripe, funnel, fetchedAt: new Date().toISOString() };
 }
 
 // Cached wrapper: repeated requests reuse the cached result until it goes stale,

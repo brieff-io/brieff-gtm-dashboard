@@ -1,5 +1,5 @@
 import { getDashboardData } from "@/lib/dashboard";
-import { fmtCurrency, fmtNum, pct } from "@/lib/format";
+import { fmtCurrency, fmtNum, fmtRelativeTime, pct } from "@/lib/format";
 import { Card, Kpi, SectionHeader } from "@/components/ui";
 import { Funnel } from "@/components/funnel";
 import { ChannelChart, SessionsChart } from "@/components/charts";
@@ -10,7 +10,14 @@ import { ChannelChart, SessionsChart } from "@/components/charts";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { range, ga4, hubspot, stripe, funnel } = await getDashboardData(30);
+  const { range, ga4, hubspot, stripe, funnel, fetchedAt } =
+    await getDashboardData(30);
+
+  // Drive the per-KPI "—" state off each source's status so an errored fetch
+  // never shows as a real 0.
+  const ga4Ok = ga4.status === "ok";
+  const hubspotOk = hubspot.status === "ok";
+  const stripeOk = stripe.status === "ok";
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-8">
@@ -24,9 +31,12 @@ export default async function DashboardPage() {
             {range.start} to {range.end} (last {range.days} days)
           </p>
         </div>
-        <p className="text-xs text-steel">
-          Sources: GA4 · HubSpot · Stripe
-        </p>
+        <div className="text-right">
+          <p className="text-xs text-steel">Sources: GA4 · HubSpot · Stripe</p>
+          <p className="mt-1 text-xs text-steel">
+            Updated {fmtRelativeTime(fetchedAt)}
+          </p>
+        </div>
       </div>
 
       {/* Funnel */}
@@ -37,26 +47,29 @@ export default async function DashboardPage() {
 
       {/* KPI row */}
       <section className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-        <Kpi label="Sessions" value={fmtNum(ga4.sessions)} hint={`${fmtNum(ga4.users)} users`} />
+        <Kpi label="Sessions" value={fmtNum(ga4.sessions)} hint={`${fmtNum(ga4.users)} users`} unavailable={!ga4Ok} />
         <Kpi
           label="Demo clicks"
           value={fmtNum(ga4.demoClicks)}
           hint={`${pct(ga4.demoClicks, ga4.sessions)} of sessions`}
+          unavailable={!ga4Ok}
         />
-        <Kpi label="New contacts" value={fmtNum(hubspot.newContacts)} hint="HubSpot, in range" />
+        <Kpi label="New contacts" value={fmtNum(hubspot.newContacts)} hint="HubSpot, in range" unavailable={!hubspotOk} />
         <Kpi
           label="Pipeline value"
           value={fmtCurrency(hubspot.pipelineValue, stripe.currency)}
           hint={`${fmtNum(hubspot.openDeals)} open deals`}
+          unavailable={!hubspotOk}
         />
-        <Kpi label="Deals created" value={fmtNum(hubspot.dealsCreated)} hint="In range" />
+        <Kpi label="Deals created" value={fmtNum(hubspot.dealsCreated)} hint="In range" unavailable={!hubspotOk} />
         <Kpi
           label="Closed won"
           value={fmtNum(hubspot.wonDeals)}
           hint={fmtCurrency(hubspot.wonValue, stripe.currency)}
+          unavailable={!hubspotOk}
         />
-        <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} hint={`${fmtNum(stripe.activeSubscriptions)} active subscribers`} />
-        <Kpi label="New customers" value={fmtNum(stripe.newCustomers)} hint="Stripe, in range" />
+        <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} hint={`${fmtNum(stripe.activeSubscriptions)} active subscribers`} unavailable={!stripeOk} />
+        <Kpi label="New customers" value={fmtNum(stripe.newCustomers)} hint="Stripe, in range" unavailable={!stripeOk} />
       </section>
 
       {/* GA4 */}
@@ -77,10 +90,10 @@ export default async function DashboardPage() {
           </Card>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Kpi label="Leads (form)" value={fmtNum(ga4.leads)} hint="generate_lead" />
-          <Kpi label="Newsletter" value={fmtNum(ga4.newsletterSignups)} hint="signups" />
-          <Kpi label="Video plays" value={fmtNum(ga4.videoPlays)} hint="video_start" />
-          <Kpi label="New users" value={fmtNum(ga4.newUsers)} hint="first-time" />
+          <Kpi label="Leads (form)" value={fmtNum(ga4.leads)} hint="generate_lead" unavailable={!ga4Ok} />
+          <Kpi label="Newsletter" value={fmtNum(ga4.newsletterSignups)} hint="signups" unavailable={!ga4Ok} />
+          <Kpi label="Video plays" value={fmtNum(ga4.videoPlays)} hint="video_start" unavailable={!ga4Ok} />
+          <Kpi label="New users" value={fmtNum(ga4.newUsers)} hint="first-time" unavailable={!ga4Ok} />
         </div>
       </section>
 
@@ -112,10 +125,10 @@ export default async function DashboardPage() {
       <section className="mb-8">
         <SectionHeader title="Revenue (Stripe)" status={stripe.status} note={stripe.status === "error" ? stripe.error : undefined} />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} hint={stripe.currency.toUpperCase()} />
-          <Kpi label="ARR (est.)" value={fmtCurrency(stripe.mrr * 12, stripe.currency)} hint={stripe.currency.toUpperCase()} />
-          <Kpi label="Active subscribers" value={fmtNum(stripe.activeSubscriptions)} hint="paying" />
-          <Kpi label="New customers" value={fmtNum(stripe.newCustomers)} hint="in range" />
+          <Kpi label="MRR" value={fmtCurrency(stripe.mrr, stripe.currency)} hint={stripe.currency.toUpperCase()} unavailable={!stripeOk} />
+          <Kpi label="ARR (est.)" value={fmtCurrency(stripe.mrr * 12, stripe.currency)} hint={stripe.currency.toUpperCase()} unavailable={!stripeOk} />
+          <Kpi label="Active subscribers" value={fmtNum(stripe.activeSubscriptions)} hint="paying" unavailable={!stripeOk} />
+          <Kpi label="New customers" value={fmtNum(stripe.newCustomers)} hint="in range" unavailable={!stripeOk} />
         </div>
         {stripe.mrrByCurrency.length > 1 && (
           <p className="mt-3 text-xs text-steel">

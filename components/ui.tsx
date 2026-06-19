@@ -21,20 +21,30 @@ export function Kpi({
   label,
   value,
   hint,
+  unavailable = false,
 }: {
   label: string;
   value: string;
   hint?: string;
+  // When the source errored/isn't connected, show "—" rather than a 0 that
+  // reads as a real result.
+  unavailable?: boolean;
 }) {
   return (
     <Card>
       <div className="text-xs font-semibold uppercase tracking-wide text-steel">
         {label}
       </div>
-      <div className="mt-2 text-3xl font-semibold tracking-tight text-ink">
-        {value}
+      <div
+        className={`mt-2 text-3xl font-semibold tracking-tight ${
+          unavailable ? "text-steel/50" : "text-ink"
+        }`}
+      >
+        {unavailable ? "—" : value}
       </div>
-      {hint ? <div className="mt-1 text-sm text-steel">{hint}</div> : null}
+      <div className="mt-1 text-sm text-steel">
+        {unavailable ? "Source unavailable" : hint ?? " "}
+      </div>
     </Card>
   );
 }

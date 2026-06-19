@@ -23,6 +23,23 @@ const LIFECYCLE_STAGES = [
 const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
 
+// HubSpot's Search API enforces a strict "secondly" rate limit (~4 req/s). This
+// fetcher fires many searches per load (new contacts, 5 lifecycle counts, deal
+// pages, won-deal pages), and concurrent dashboard renders share the same limit,
+// so unspaced bursts return 429 and blank the whole section. Route every search
+// through one module-level gate that fully serializes calls and spaces them, so
+// all in-flight requests across the process stay under the limit.
+const MIN_SPACING_MS = 250;
+let gate: Promise<unknown> = Promise.resolve();
+function throttle<T>(fn: () => Promise<T>): Promise<T> {
+  const result = gate.then(async () => {
+    await new Promise((r) => setTimeout(r, MIN_SPACING_MS));
+    return fn();
+  });
+  gate = result.catch(() => {}); // next call waits regardless of this one's outcome
+  return result;
+}
+
 const EMPTY: HubSpotMetrics = {
   status: "not_configured",
   newContacts: 0,
@@ -56,7 +73,7 @@ export async function getHubSpotMetrics(
         object === "contacts"
           ? client.crm.contacts.searchApi
           : client.crm.deals.searchApi;
-      const r = await api.doSearch(req);
+      const r = await throttle(() => api.doSearch(req));
       return r.total ?? 0;
     };
 
@@ -93,7 +110,7 @@ export async function getHubSpotMetrics(
         limit: PAGE_SIZE,
         after,
       };
-      const r = await client.crm.deals.searchApi.doSearch(req);
+      const r = await throttle(() => client.crm.deals.searchApi.doSearch(req));
       for (const d of r.results ?? []) {
         const amt = Number(d.properties?.amount) || 0;
         const stage = d.properties?.dealstage || "unknown";
@@ -126,7 +143,7 @@ export async function getHubSpotMetrics(
         limit: PAGE_SIZE,
         after,
       };
-      const r = await client.crm.deals.searchApi.doSearch(req);
+      const r = await throttle(() => client.crm.deals.searchApi.doSearch(req));
       for (const d of r.results ?? []) {
         wonDeals += 1;
         wonValue += Number(d.properties?.amount) || 0;

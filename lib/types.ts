@@ -52,6 +52,10 @@ export interface FunnelStage {
   label: string;
   value: number;
   source: string;
+  // False when the underlying source errored/wasn't configured, so the UI can
+  // show "unavailable" instead of a misleading 0 (a failed fetch must not read
+  // as "no pipeline").
+  available: boolean;
 }
 
 export interface DashboardData {
@@ -60,4 +64,5 @@ export interface DashboardData {
   hubspot: HubSpotMetrics;
   stripe: StripeMetrics;
   funnel: FunnelStage[];
+  fetchedAt: string; // ISO time the source data was actually fetched (pre-cache)
 }
