@@ -1,8 +1,9 @@
 import { getDashboardData } from "@/lib/dashboard";
 import { fmtCurrency, fmtNum, fmtRelativeTime, pct } from "@/lib/format";
-import { Card, Kpi, SectionHeader } from "@/components/ui";
+import { Card, DeltaBadge, Kpi, SectionHeader } from "@/components/ui";
 import { Funnel } from "@/components/funnel";
-import { ChannelChart, SessionsChart } from "@/components/charts";
+import { AudienceView } from "@/components/audience-view";
+import { ChannelChart, SessionsChart, WebsiteTrendChart } from "@/components/charts";
 
 // The page renders per request, but external data (GA4/HubSpot/Stripe) is cached
 // in getDashboardData and refreshed at most every 10 minutes, so refreshing the
@@ -106,14 +107,24 @@ export default async function DashboardPage() {
         <Funnel stages={funnel} />
       </section>
 
-      {/* GA4 */}
+      {/* Website performance (GA4) — host-filtered; demo is the gating conversion */}
       <section className="mb-8">
         <SectionHeader
-          title="Web acquisition (GA4)"
+          title="Website performance (GA4)"
           status={ga4.status}
-          note={ga4.status === "error" ? ga4.error : undefined}
+          note={ga4.status === "error" ? ga4.error : `${ga4.host} only`}
         />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+        {/* Dual view: raw totals vs prospects-only vs existing customers */}
+        {ga4Ok ? (
+          <AudienceView
+            all={ga4.audience.all}
+            prospects={ga4.audience.new}
+            existing={ga4.audience.returning}
+          />
+        ) : null}
+
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card>
             <div className="mb-2 text-sm font-medium text-ink">Sessions over time</div>
             <SessionsChart data={ga4.timeseries} />
@@ -123,28 +134,54 @@ export default async function DashboardPage() {
             <ChannelChart data={ga4.byChannel} />
           </Card>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <Kpi
-            label="Sessions"
-            value={fmtNum(ga4.sessions)}
-            hint={`${fmtNum(ga4.users)} users`}
-            unavailable={!ga4Ok}
-            delta={{ cur: ga4.sessions, prev: ga4.previous.sessions }}
-          />
-          <Kpi
-            label="Demo clicks"
-            value={fmtNum(ga4.demoClicks)}
-            hint={`${pct(ga4.demoClicks, ga4.sessions)} of sessions`}
-            unavailable={!ga4Ok}
-            delta={{ cur: ga4.demoClicks, prev: ga4.previous.demoClicks }}
-          />
-          <Kpi
-            label="New users"
-            value={fmtNum(ga4.newUsers)}
-            hint="first-time"
-            unavailable={!ga4Ok}
-            delta={{ cur: ga4.newUsers, prev: ga4.previous.newUsers }}
-          />
+
+        {/* Demo focus — the gate every signup passes through */}
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <Card>
+            <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+              Demo clicks · the gate
+            </div>
+            {ga4Ok ? (
+              <>
+                <div className="mt-2 flex items-baseline gap-3">
+                  <span className="text-4xl font-semibold tracking-tight text-ink">
+                    {fmtNum(ga4.demoClicks)}
+                  </span>
+                  <DeltaBadge cur={ga4.demoClicks} prev={ga4.previous.demoClicks} />
+                </div>
+                <div className="mt-1 text-sm text-steel">
+                  {pct(ga4.demoClicks, ga4.sessions)} of sessions · every signup starts here
+                </div>
+              </>
+            ) : (
+              <div className="mt-2 text-4xl font-semibold tracking-tight text-steel/50">—</div>
+            )}
+          </Card>
+          <Card>
+            <div className="mb-3 text-sm font-medium text-ink">Where demos start</div>
+            <Table
+              rows={ga4.demoByPage.map((r) => [r.page, fmtNum(r.count)])}
+              empty="No demo clicks in range."
+              plain
+            />
+          </Card>
+          <Card>
+            <div className="mb-3 text-sm font-medium text-ink">Demos by channel</div>
+            <Table
+              rows={ga4.demoByChannel.map((r) => [r.channel, fmtNum(r.count)])}
+              empty="No demo clicks in range."
+            />
+          </Card>
+        </div>
+
+        <Card className="mt-4">
+          <div className="mb-2 text-sm font-medium text-ink">
+            Demo clicks vs sign-ins (weekly)
+          </div>
+          <WebsiteTrendChart data={ga4.trend} />
+        </Card>
+
+        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
           <Kpi
             label="Leads (form)"
             value={fmtNum(ga4.leads)}
@@ -165,6 +202,13 @@ export default async function DashboardPage() {
             hint="video_start"
             unavailable={!ga4Ok}
             delta={{ cur: ga4.videoPlays, prev: ga4.previous.videoPlays }}
+          />
+          <Kpi
+            label="Sign-in clicks"
+            value={fmtNum(ga4.signIns)}
+            hint="existing customers"
+            unavailable={!ga4Ok}
+            delta={{ cur: ga4.signIns, prev: ga4.previous.signIns }}
           />
         </div>
       </section>
@@ -234,15 +278,27 @@ export default async function DashboardPage() {
   );
 }
 
-function Table({ rows, empty }: { rows: [string, string][]; empty: string }) {
+function Table({
+  rows,
+  empty,
+  plain = false,
+}: {
+  rows: [string, string][];
+  empty: string;
+  // `plain` keeps keys verbatim (for URL paths); otherwise they're prettified
+  // (underscores → spaces, capitalized) for things like lifecycle stage names.
+  plain?: boolean;
+}) {
   if (rows.length === 0) {
     return <p className="text-sm text-steel">{empty}</p>;
   }
   return (
     <div className="divide-y divide-hairline">
       {rows.map(([k, v]) => (
-        <div key={k} className="flex items-center justify-between py-2 text-sm">
-          <span className="capitalize text-slate">{k.replace(/_/g, " ")}</span>
+        <div key={k} className="flex items-center justify-between gap-3 py-2 text-sm">
+          <span className={plain ? "truncate text-slate" : "capitalize text-slate"}>
+            {plain ? k : k.replace(/_/g, " ")}
+          </span>
           <span className="font-medium text-ink">{v}</span>
         </div>
       ))}

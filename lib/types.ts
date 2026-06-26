@@ -11,10 +11,22 @@ export interface DateRange {
   days: number;
 }
 
+// Headline traffic stats for one audience segment (all / new / returning), so the
+// dashboard can switch between raw totals and a prospects-only view.
+export interface AudienceStats {
+  sessions: number;
+  users: number;
+  engagedSessions: number;
+  engagementRate: number; // 0..1
+  bounceRate: number; // 0..1
+}
+
 // Windowed (flow) metrics carry their prior-period value so the UI can show a
 // period-over-period delta. Point-in-time metrics (MRR, open pipeline, lifecycle
 // totals) have no prior value here — they need historical snapshots, not a
 // second range query — so they're deliberately left out of `previous`.
+// All GA4 figures are filtered to the production host (excludes dev/preview),
+// and sign-ins alias the old + new event names into one series.
 export interface Ga4Metrics {
   status: SourceStatus;
   error?: string;
@@ -27,6 +39,12 @@ export interface Ga4Metrics {
   videoPlays: number; // video_start
   byChannel: { channel: string; sessions: number }[];
   timeseries: { date: string; sessions: number }[];
+  host: string; // production host the GA4 data is filtered to
+  audience: { all: AudienceStats; new: AudienceStats; returning: AudienceStats };
+  signIns: number; // login_click + legacy click_button_signin_navbar (existing-customer intent)
+  demoByPage: { page: string; count: number }[]; // where demo CTAs are clicked
+  demoByChannel: { channel: string; count: number }[];
+  trend: { week: string; demo: number; signin: number }[]; // weekly, ISO-week start
   previous: {
     sessions: number;
     users: number;
@@ -35,6 +53,7 @@ export interface Ga4Metrics {
     leads: number;
     newsletterSignups: number;
     videoPlays: number;
+    signIns: number;
   };
 }
 
