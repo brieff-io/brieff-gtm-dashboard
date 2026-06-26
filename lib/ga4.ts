@@ -22,14 +22,33 @@ const EMPTY: Ga4Metrics = {
   videoPlays: 0,
   byChannel: [],
   timeseries: [],
+  previous: {
+    sessions: 0,
+    users: 0,
+    newUsers: 0,
+    demoClicks: 0,
+    leads: 0,
+    newsletterSignups: 0,
+    videoPlays: 0,
+  },
 };
+
+const EVENT_NAMES = [
+  "demo_click",
+  "generate_lead",
+  "newsletter_signup",
+  "video_start",
+];
 
 function num(v: string | null | undefined): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
-export async function getGa4Metrics(range: DateRange): Promise<Ga4Metrics> {
+export async function getGa4Metrics(
+  range: DateRange,
+  prev: DateRange,
+): Promise<Ga4Metrics> {
   if (!PROPERTY_ID || !CLIENT_EMAIL || !PRIVATE_KEY) return EMPTY;
 
   try {
@@ -38,59 +57,68 @@ export async function getGa4Metrics(range: DateRange): Promise<Ga4Metrics> {
     });
     const property = `properties/${PROPERTY_ID}`;
     const dateRanges = [{ startDate: range.start, endDate: range.end }];
+    const prevRanges = [{ startDate: prev.start, endDate: prev.end }];
 
-    const [totals, events, channels, series] = await Promise.all([
-      client.runReport({
-        property,
-        dateRanges,
-        metrics: [
-          { name: "sessions" },
-          { name: "totalUsers" },
-          { name: "newUsers" },
-        ],
-      }),
-      client.runReport({
-        property,
-        dateRanges,
-        dimensions: [{ name: "eventName" }],
-        metrics: [{ name: "eventCount" }],
-        dimensionFilter: {
-          filter: {
-            fieldName: "eventName",
-            inListFilter: {
-              values: [
-                "demo_click",
-                "generate_lead",
-                "newsletter_signup",
-                "video_start",
-              ],
-            },
-          },
+    // Reusable query builders so the current and previous windows are computed
+    // identically (only the date range differs).
+    const totalsReq = (dr: typeof dateRanges) => ({
+      property,
+      dateRanges: dr,
+      metrics: [
+        { name: "sessions" },
+        { name: "totalUsers" },
+        { name: "newUsers" },
+      ],
+    });
+    const eventsReq = (dr: typeof dateRanges) => ({
+      property,
+      dateRanges: dr,
+      dimensions: [{ name: "eventName" }],
+      metrics: [{ name: "eventCount" }],
+      dimensionFilter: {
+        filter: {
+          fieldName: "eventName",
+          inListFilter: { values: EVENT_NAMES },
         },
-      }),
-      client.runReport({
-        property,
-        dateRanges,
-        dimensions: [{ name: "sessionDefaultChannelGroup" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      client.runReport({
-        property,
-        dateRanges,
-        dimensions: [{ name: "date" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ dimension: { dimensionName: "date" } }],
-      }),
-    ]);
+      },
+    });
+
+    const [totals, events, channels, series, prevTotals, prevEvents] =
+      await Promise.all([
+        client.runReport(totalsReq(dateRanges)),
+        client.runReport(eventsReq(dateRanges)),
+        client.runReport({
+          property,
+          dateRanges,
+          dimensions: [{ name: "sessionDefaultChannelGroup" }],
+          metrics: [{ name: "sessions" }],
+          orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+          limit: 10,
+        }),
+        client.runReport({
+          property,
+          dateRanges,
+          dimensions: [{ name: "date" }],
+          metrics: [{ name: "sessions" }],
+          orderBys: [{ dimension: { dimensionName: "date" } }],
+        }),
+        client.runReport(totalsReq(prevRanges)),
+        client.runReport(eventsReq(prevRanges)),
+      ]);
+
+    type Report = (typeof totals)[0];
+    const eventCounts = (report: Report): Record<string, number> => {
+      const map: Record<string, number> = {};
+      for (const row of report.rows ?? []) {
+        map[row.dimensionValues?.[0]?.value ?? ""] = num(row.metricValues?.[0]?.value);
+      }
+      return map;
+    };
 
     const t = totals[0].rows?.[0]?.metricValues ?? [];
-    const eventMap: Record<string, number> = {};
-    for (const row of events[0].rows ?? []) {
-      const name = row.dimensionValues?.[0]?.value ?? "";
-      eventMap[name] = num(row.metricValues?.[0]?.value);
-    }
+    const eventMap = eventCounts(events[0]);
+    const pt = prevTotals[0].rows?.[0]?.metricValues ?? [];
+    const prevEventMap = eventCounts(prevEvents[0]);
 
     return {
       status: "ok",
@@ -111,6 +139,15 @@ export async function getGa4Metrics(range: DateRange): Promise<Ga4Metrics> {
           d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d;
         return { date, sessions: num(r.metricValues?.[0]?.value) };
       }),
+      previous: {
+        sessions: num(pt[0]?.value),
+        users: num(pt[1]?.value),
+        newUsers: num(pt[2]?.value),
+        demoClicks: prevEventMap["demo_click"] ?? 0,
+        leads: prevEventMap["generate_lead"] ?? 0,
+        newsletterSignups: prevEventMap["newsletter_signup"] ?? 0,
+        videoPlays: prevEventMap["video_start"] ?? 0,
+      },
     };
   } catch (e) {
     return { ...EMPTY, status: "error", error: (e as Error).message };

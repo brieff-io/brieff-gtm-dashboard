@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { lastNDays } from "./range";
+import { lastNDays, previousPeriod } from "./range";
 import { getGa4Metrics } from "./ga4";
 import { getHubSpotMetrics } from "./hubspot";
 import { getStripeMetrics } from "./stripe";
@@ -16,10 +16,11 @@ const REVALIDATE_SECONDS = 600;
 // dashboard always renders.
 async function fetchDashboardData(days: number): Promise<DashboardData> {
   const range = lastNDays(days);
+  const prev = previousPeriod(range);
   const [ga4, hubspot, stripe] = await Promise.all([
-    getGa4Metrics(range),
-    getHubSpotMetrics(range),
-    getStripeMetrics(range),
+    getGa4Metrics(range, prev),
+    getHubSpotMetrics(range, prev),
+    getStripeMetrics(range, prev),
   ]);
 
   // A stage is only "available" if its source actually returned ok. Otherwise

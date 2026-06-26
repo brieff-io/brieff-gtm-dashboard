@@ -20,6 +20,7 @@ const EMPTY: StripeMetrics = {
   activeSubscriptions: 0,
   newCustomers: 0,
   currency: BASE,
+  previous: { newCustomers: 0 },
 };
 
 function toMonthly(
@@ -118,7 +119,10 @@ async function ratesToBase(currencies: string[]): Promise<Record<string, number>
   return rates;
 }
 
-export async function getStripeMetrics(range: DateRange): Promise<StripeMetrics> {
+export async function getStripeMetrics(
+  range: DateRange,
+  prev: DateRange,
+): Promise<StripeMetrics> {
   if (!KEY) return EMPTY;
 
   try {
@@ -186,6 +190,9 @@ export async function getStripeMetrics(range: DateRange): Promise<StripeMetrics>
     const startSec = Math.floor(
       new Date(`${range.start}T00:00:00Z`).getTime() / 1000,
     );
+    const prevStartSec = Math.floor(
+      new Date(`${prev.start}T00:00:00Z`).getTime() / 1000,
+    );
     let newCustomers = 0;
     for await (const _c of stripe.customers.list({
       created: { gte: startSec },
@@ -195,6 +202,16 @@ export async function getStripeMetrics(range: DateRange): Promise<StripeMetrics>
       newCustomers += 1;
     }
 
+    // Customers created in the previous window [prevStart, start) for the delta.
+    let prevNewCustomers = 0;
+    for await (const _c of stripe.customers.list({
+      created: { gte: prevStartSec, lt: startSec },
+      limit: 100,
+    })) {
+      void _c;
+      prevNewCustomers += 1;
+    }
+
     return {
       status: "ok",
       mrr: Math.round(blended * 100) / 100,
@@ -202,6 +219,7 @@ export async function getStripeMetrics(range: DateRange): Promise<StripeMetrics>
       activeSubscriptions,
       newCustomers,
       currency: BASE,
+      previous: { newCustomers: prevNewCustomers },
     };
   } catch (e) {
     return { ...EMPTY, status: "error", error: (e as Error).message };

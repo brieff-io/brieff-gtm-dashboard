@@ -11,6 +11,10 @@ export interface DateRange {
   days: number;
 }
 
+// Windowed (flow) metrics carry their prior-period value so the UI can show a
+// period-over-period delta. Point-in-time metrics (MRR, open pipeline, lifecycle
+// totals) have no prior value here — they need historical snapshots, not a
+// second range query — so they're deliberately left out of `previous`.
 export interface Ga4Metrics {
   status: SourceStatus;
   error?: string;
@@ -23,6 +27,15 @@ export interface Ga4Metrics {
   videoPlays: number; // video_start
   byChannel: { channel: string; sessions: number }[];
   timeseries: { date: string; sessions: number }[];
+  previous: {
+    sessions: number;
+    users: number;
+    newUsers: number;
+    demoClicks: number;
+    leads: number;
+    newsletterSignups: number;
+    videoPlays: number;
+  };
 }
 
 export interface HubSpotMetrics {
@@ -36,6 +49,11 @@ export interface HubSpotMetrics {
   wonDeals: number; // closed-won in range
   wonValue: number; // sum of closed-won amounts in range
   byDealStage: { stage: string; count: number; amount: number }[];
+  previous: {
+    newContacts: number;
+    dealsCreated: number;
+    wonDeals: number;
+  };
 }
 
 export interface StripeMetrics {
@@ -46,6 +64,9 @@ export interface StripeMetrics {
   activeSubscriptions: number; // paying subscriptions (excludes $0/free), matches Stripe
   newCustomers: number; // created in range
   currency: string; // base currency code, e.g. "aud"
+  previous: {
+    newCustomers: number;
+  };
 }
 
 export interface FunnelStage {

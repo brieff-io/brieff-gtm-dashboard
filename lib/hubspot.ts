@@ -50,10 +50,12 @@ const EMPTY: HubSpotMetrics = {
   wonDeals: 0,
   wonValue: 0,
   byDealStage: [],
+  previous: { newContacts: 0, dealsCreated: 0, wonDeals: 0 },
 };
 
 export async function getHubSpotMetrics(
   range: DateRange,
+  prev: DateRange,
 ): Promise<HubSpotMetrics> {
   if (!TOKEN) return EMPTY;
 
@@ -62,6 +64,8 @@ export async function getHubSpotMetrics(
     // limit doesn't blank the whole pipeline section.
     const client = new Client({ accessToken: TOKEN, numberOfApiCallRetries: 3 });
     const startMs = String(new Date(`${range.start}T00:00:00Z`).getTime());
+    // Previous window is [prev.start, range.start): GTE prevStartMs AND LT startMs.
+    const prevStartMs = String(new Date(`${prev.start}T00:00:00Z`).getTime());
 
     const countSearch = async (
       object: "contacts" | "deals",
@@ -152,6 +156,22 @@ export async function getHubSpotMetrics(
       if (!after) break;
     }
 
+    // Previous-window counts for period-over-period deltas (cheap total-only
+    // searches; amounts/pagination intentionally not repeated for the baseline).
+    const prevNewContacts = await countSearch("contacts", [
+      { propertyName: "createdate", operator: "GTE", value: prevStartMs },
+      { propertyName: "createdate", operator: "LT", value: startMs },
+    ]);
+    const prevDealsCreated = await countSearch("deals", [
+      { propertyName: "createdate", operator: "GTE", value: prevStartMs },
+      { propertyName: "createdate", operator: "LT", value: startMs },
+    ]);
+    const prevWonDeals = await countSearch("deals", [
+      { propertyName: "hs_is_closed_won", operator: "EQ", value: "true" },
+      { propertyName: "closedate", operator: "GTE", value: prevStartMs },
+      { propertyName: "closedate", operator: "LT", value: startMs },
+    ]);
+
     return {
       status: "ok",
       newContacts,
@@ -166,6 +186,11 @@ export async function getHubSpotMetrics(
         count: v.count,
         amount: v.amount,
       })),
+      previous: {
+        newContacts: prevNewContacts,
+        dealsCreated: prevDealsCreated,
+        wonDeals: prevWonDeals,
+      },
     };
   } catch (e) {
     return { ...EMPTY, status: "error", error: (e as Error).message };
