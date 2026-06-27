@@ -4,6 +4,7 @@ import { getGa4Metrics } from "./ga4";
 import { getHubSpotMetrics } from "./hubspot";
 import { getStripeMetrics } from "./stripe";
 import { getBigQueryInsights } from "./bigquery";
+import { getMrrTrend } from "./snapshots";
 import type { DashboardData, FunnelStage } from "./types";
 
 // External data is fetched at most once per REVALIDATE_SECONDS and then served
@@ -18,11 +19,12 @@ const REVALIDATE_SECONDS = 600;
 async function fetchDashboardData(days: number): Promise<DashboardData> {
   const range = lastNDays(days);
   const prev = previousPeriod(range);
-  const [ga4, hubspot, stripe, bigquery] = await Promise.all([
+  const [ga4, hubspot, stripe, bigquery, mrrTrend] = await Promise.all([
     getGa4Metrics(range, prev),
     getHubSpotMetrics(range, prev),
     getStripeMetrics(range, prev),
     getBigQueryInsights(range),
+    getMrrTrend(90),
   ]);
 
   // The acquisition pipeline that actually makes money: website → demo → trial →
@@ -45,6 +47,7 @@ async function fetchDashboardData(days: number): Promise<DashboardData> {
     stripe,
     funnel,
     bigquery,
+    mrrTrend,
     fetchedAt: new Date().toISOString(),
   };
 }

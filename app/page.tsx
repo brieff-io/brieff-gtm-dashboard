@@ -3,7 +3,12 @@ import { fmtCurrency, fmtNum, fmtRelativeTime, pct } from "@/lib/format";
 import { Card, DeltaBadge, Kpi, SectionHeader } from "@/components/ui";
 import { Funnel } from "@/components/funnel";
 import { AudienceView } from "@/components/audience-view";
-import { ChannelChart, SessionsChart, WebsiteTrendChart } from "@/components/charts";
+import {
+  ChannelChart,
+  MrrTrendChart,
+  SessionsChart,
+  WebsiteTrendChart,
+} from "@/components/charts";
 
 // The page renders per request, but external data (GA4/HubSpot/Stripe) is cached
 // in getDashboardData and refreshed at most every 10 minutes, so refreshing the
@@ -11,7 +16,7 @@ import { ChannelChart, SessionsChart, WebsiteTrendChart } from "@/components/cha
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { range, ga4, hubspot, stripe, funnel, bigquery, fetchedAt } =
+  const { range, ga4, hubspot, stripe, funnel, bigquery, mrrTrend, fetchedAt } =
     await getDashboardData(30);
 
   // Drive the per-KPI "—" state off each source's status so an errored fetch
@@ -95,10 +100,21 @@ export default async function DashboardPage() {
             delta={{ cur: stripe.newCustomers, prev: stripe.previous.newCustomers }}
           />
         </div>
-        <p className="mt-3 text-xs text-steel">
-          MRR, ARR and subscriber counts are point-in-time, so they have no
-          period delta yet — that needs daily snapshots (next phase).
-        </p>
+        <Card className="mt-4">
+          <div className="mb-2 text-sm font-medium text-ink">MRR over time</div>
+          {mrrTrend.length >= 2 ? (
+            <MrrTrendChart
+              data={mrrTrend.map((p) => ({ date: p.date, mrr: p.mrr }))}
+              currency={stripe.currency}
+            />
+          ) : (
+            <p className="text-sm text-steel">
+              Recording daily — the MRR trend builds from here (
+              {mrrTrend.length} day{mrrTrend.length === 1 ? "" : "s"} captured so
+              far).
+            </p>
+          )}
+        </Card>
       </section>
 
       {/* Acquisition funnel — website → demo → trial → paid */}

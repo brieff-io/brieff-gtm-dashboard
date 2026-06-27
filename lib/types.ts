@@ -120,6 +120,15 @@ export interface BigQueryInsights {
   recentUsers: number;
 }
 
+// One day's recorded revenue state. MRR/ARR/subscribers/trials are point-in-time,
+// so a daily cron snapshots them into BigQuery to build a real trend over time.
+export interface SnapshotPoint {
+  date: string; // YYYY-MM-DD
+  mrr: number;
+  activeSubscribers: number;
+  trials: number;
+}
+
 export interface DashboardData {
   range: DateRange;
   ga4: Ga4Metrics;
@@ -127,5 +136,6 @@ export interface DashboardData {
   stripe: StripeMetrics;
   funnel: FunnelStage[];
   bigquery: BigQueryInsights;
+  mrrTrend: SnapshotPoint[]; // daily revenue snapshots (empty until they accrue)
   fetchedAt: string; // ISO time the source data was actually fetched (pre-cache)
 }

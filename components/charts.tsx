@@ -69,6 +69,51 @@ export function ChannelChart({
   );
 }
 
+// MRR over time, from daily snapshots. The growth story the point-in-time MRR
+// number can't tell on its own.
+export function MrrTrendChart({
+  data,
+  currency,
+}: {
+  data: { date: string; mrr: number }[];
+  currency: string;
+}) {
+  const fmtAxis = (n: number) =>
+    new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(n || 0);
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#EEF0F3" vertical={false} />
+        <XAxis
+          dataKey="date"
+          tick={{ fontSize: 11, fill: "#6B7280" }}
+          tickFormatter={(d) => String(d).slice(5)}
+          minTickGap={24}
+        />
+        <YAxis
+          tick={{ fontSize: 11, fill: "#6B7280" }}
+          width={52}
+          tickFormatter={fmtAxis}
+          domain={["auto", "auto"]}
+        />
+        <Tooltip formatter={(v: number) => fmtAxis(v)} />
+        <Line
+          type="monotone"
+          dataKey="mrr"
+          stroke="#1F9D62"
+          strokeWidth={2}
+          dot={{ r: 2 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
 // Weekly demo (the gating conversion) vs sign-in clicks. Two y-axes because the
 // scales differ by ~20x — demo would otherwise flatline against sign-ins.
 export function WebsiteTrendChart({
