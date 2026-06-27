@@ -3,6 +3,7 @@ import { lastNDays, previousPeriod } from "./range";
 import { getGa4Metrics } from "./ga4";
 import { getHubSpotMetrics } from "./hubspot";
 import { getStripeMetrics } from "./stripe";
+import { getBigQueryInsights } from "./bigquery";
 import type { DashboardData, FunnelStage } from "./types";
 
 // External data is fetched at most once per REVALIDATE_SECONDS and then served
@@ -17,10 +18,11 @@ const REVALIDATE_SECONDS = 600;
 async function fetchDashboardData(days: number): Promise<DashboardData> {
   const range = lastNDays(days);
   const prev = previousPeriod(range);
-  const [ga4, hubspot, stripe] = await Promise.all([
+  const [ga4, hubspot, stripe, bigquery] = await Promise.all([
     getGa4Metrics(range, prev),
     getHubSpotMetrics(range, prev),
     getStripeMetrics(range, prev),
+    getBigQueryInsights(range),
   ]);
 
   // A stage is only "available" if its source actually returned ok. Otherwise
@@ -35,7 +37,15 @@ async function fetchDashboardData(days: number): Promise<DashboardData> {
     { label: "Customers won", value: hubspot.wonDeals, source: "HubSpot", available: hubspotOk },
   ];
 
-  return { range, ga4, hubspot, stripe, funnel, fetchedAt: new Date().toISOString() };
+  return {
+    range,
+    ga4,
+    hubspot,
+    stripe,
+    funnel,
+    bigquery,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 // Cached wrapper: repeated requests reuse the cached result until it goes stale,

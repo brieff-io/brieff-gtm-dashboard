@@ -11,7 +11,7 @@ import { ChannelChart, SessionsChart, WebsiteTrendChart } from "@/components/cha
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { range, ga4, hubspot, stripe, funnel, fetchedAt } =
+  const { range, ga4, hubspot, stripe, funnel, bigquery, fetchedAt } =
     await getDashboardData(30);
 
   // Drive the per-KPI "—" state off each source's status so an errored fetch
@@ -212,6 +212,49 @@ export default async function DashboardPage() {
           />
         </div>
       </section>
+
+      {/* Visitor journey (BigQuery) — event-level export; activates when data lands */}
+      {bigquery.status !== "not_configured" ? (
+        <section className="mb-8">
+          <SectionHeader
+            title="Visitor journey (BigQuery)"
+            status={
+              bigquery.status === "ok"
+                ? "ok"
+                : bigquery.status === "error"
+                  ? "error"
+                  : undefined
+            }
+            note={
+              bigquery.status === "pending" || bigquery.recentEvents === 0
+                ? "export linked · first daily data ~24h"
+                : undefined
+            }
+          />
+          <Card>
+            {bigquery.status === "ok" && bigquery.recentEvents > 0 ? (
+              <div className="text-sm text-slate">
+                Event export live —{" "}
+                <span className="font-medium text-ink">{fmtNum(bigquery.recentEvents)}</span>{" "}
+                events from{" "}
+                <span className="font-medium text-ink">{fmtNum(bigquery.recentUsers)}</span>{" "}
+                users in range. Sequential funnel, top paths-to-demo, and
+                first-touch attribution build on this next.
+              </div>
+            ) : bigquery.status === "error" ? (
+              <div className="text-sm text-steel">
+                BigQuery unavailable — {bigquery.error}
+              </div>
+            ) : (
+              <div className="text-sm text-steel">
+                GA4 → BigQuery export connected. The first daily export lands
+                within ~24h, then journey, path, and true-funnel analytics
+                activate here automatically.
+              </div>
+            )}
+          </Card>
+        </section>
+      ) : null}
 
       {/* HubSpot */}
       <section className="mb-8">

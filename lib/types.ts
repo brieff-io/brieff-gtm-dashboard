@@ -98,11 +98,22 @@ export interface FunnelStage {
   available: boolean;
 }
 
+// GA4 → BigQuery event-level export (true journey/path/funnel analysis the Data
+// API can't do). `pending` = export linked but the first daily tables haven't
+// landed yet (~24h after linking); the section stays quiet until real data.
+export interface BigQueryInsights {
+  status: "ok" | "not_configured" | "error" | "pending";
+  error?: string;
+  recentEvents: number;
+  recentUsers: number;
+}
+
 export interface DashboardData {
   range: DateRange;
   ga4: Ga4Metrics;
   hubspot: HubSpotMetrics;
   stripe: StripeMetrics;
   funnel: FunnelStage[];
+  bigquery: BigQueryInsights;
   fetchedAt: string; // ISO time the source data was actually fetched (pre-cache)
 }
