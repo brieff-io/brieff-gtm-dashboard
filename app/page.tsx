@@ -88,9 +88,9 @@ export default async function DashboardPage() {
             unavailable={!stripeOk}
           />
           <Kpi
-            label="New customers"
+            label="New signups"
             value={fmtNum(stripe.newCustomers)}
-            hint={`vs ${fmtNum(stripe.previous.newCustomers)} prev`}
+            hint={`trials started · vs ${fmtNum(stripe.previous.newCustomers)} prev`}
             unavailable={!stripeOk}
             delta={{ cur: stripe.newCustomers, prev: stripe.previous.newCustomers }}
           />
@@ -101,10 +101,52 @@ export default async function DashboardPage() {
         </p>
       </section>
 
-      {/* Funnel */}
+      {/* Acquisition funnel — website → demo → trial → paid */}
       <section className="mb-8">
-        <SectionHeader title="GTM funnel" />
+        <SectionHeader title="Acquisition funnel · website → paid" />
         <Funnel stages={funnel} />
+      </section>
+
+      {/* Trials in progress — live conversion opportunities (who to follow up) */}
+      <section className="mb-8">
+        <SectionHeader
+          title="Trials in progress"
+          status={stripe.status}
+          note={
+            stripe.status === "error"
+              ? stripe.error
+              : `${fmtNum(stripe.trials.length)} active`
+          }
+        />
+        <Card>
+          {!stripeOk ? (
+            <p className="text-sm text-steel">Source unavailable.</p>
+          ) : stripe.trials.length === 0 ? (
+            <p className="text-sm text-steel">No active trials right now.</p>
+          ) : (
+            <div className="divide-y divide-hairline">
+              <div className="flex items-center justify-between pb-2 text-[11px] font-semibold uppercase tracking-wide text-steel">
+                <span>Account</span>
+                <span>Trial</span>
+              </div>
+              {stripe.trials.map((t) => (
+                <div
+                  key={t.email || t.name}
+                  className="flex items-center justify-between gap-3 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-ink">{t.name}</div>
+                    <div className="truncate text-xs text-steel">{t.email}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-ink">{t.daysLeft}d left</div>
+                    <div className="text-xs text-steel">{t.plan}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       </section>
 
       {/* Website performance (GA4) — host-filtered; demo is the gating conversion */}
@@ -259,9 +301,9 @@ export default async function DashboardPage() {
       {/* HubSpot */}
       <section className="mb-8">
         <SectionHeader
-          title="Pipeline (HubSpot)"
+          title="Sales pipeline (HubSpot)"
           status={hubspot.status}
-          note={hubspot.status === "error" ? hubspot.error : undefined}
+          note={hubspot.status === "error" ? hubspot.error : "sales-assist"}
         />
         <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
           <Kpi

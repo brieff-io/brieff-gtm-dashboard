@@ -25,16 +25,17 @@ async function fetchDashboardData(days: number): Promise<DashboardData> {
     getBigQueryInsights(range),
   ]);
 
-  // A stage is only "available" if its source actually returned ok. Otherwise
-  // the UI shows "—" so an errored fetch can't masquerade as a real zero.
+  // The acquisition pipeline that actually makes money: website → demo → trial →
+  // paid (GA4 for traffic/demo, Stripe for trials/conversions). HubSpot is a
+  // sales-assist side view, not the spine. A stage is only "available" if its
+  // source returned ok, so an errored fetch shows "—" not a misleading 0.
   const ga4Ok = ga4.status === "ok";
-  const hubspotOk = hubspot.status === "ok";
+  const stripeOk = stripe.status === "ok";
   const funnel: FunnelStage[] = [
     { label: "Visitors", value: ga4.sessions, source: "GA4 sessions", available: ga4Ok },
     { label: "Demo clicks", value: ga4.demoClicks, source: "GA4 demo_click", available: ga4Ok },
-    { label: "New contacts", value: hubspot.newContacts, source: "HubSpot", available: hubspotOk },
-    { label: "Deals created", value: hubspot.dealsCreated, source: "HubSpot", available: hubspotOk },
-    { label: "Customers won", value: hubspot.wonDeals, source: "HubSpot", available: hubspotOk },
+    { label: "Signups / trials", value: stripe.newCustomers, source: "Stripe new customers", available: stripeOk },
+    { label: "Paid conversions", value: stripe.paidConversions, source: "Stripe trial → paid", available: stripeOk },
   ];
 
   return {

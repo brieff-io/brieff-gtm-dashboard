@@ -172,6 +172,17 @@ export async function getHubSpotMetrics(
       { propertyName: "closedate", operator: "LT", value: startMs },
     ]);
 
+    // Deal-stage IDs are opaque numbers; map them to their human labels.
+    const stageLabels: Record<string, string> = {};
+    try {
+      const pipelines = await client.crm.pipelines.pipelinesApi.getAll("deals");
+      for (const p of pipelines.results ?? []) {
+        for (const st of p.stages ?? []) stageLabels[st.id] = st.label;
+      }
+    } catch {
+      // Fall back to raw stage ids if the pipelines API is unavailable.
+    }
+
     return {
       status: "ok",
       newContacts,
@@ -182,7 +193,7 @@ export async function getHubSpotMetrics(
       wonDeals,
       wonValue,
       byDealStage: Object.entries(stageMap).map(([stage, v]) => ({
-        stage,
+        stage: stageLabels[stage] || stage,
         count: v.count,
         amount: v.amount,
       })),

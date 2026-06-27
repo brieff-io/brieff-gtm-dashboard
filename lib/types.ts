@@ -75,13 +75,25 @@ export interface HubSpotMetrics {
   };
 }
 
+// A subscription currently in its trial — the pipeline stage just before paid.
+// Brieff's model is demo → 14-day trial → paid, so these are live conversion
+// opportunities (who to follow up with).
+export interface TrialAccount {
+  name: string;
+  email: string;
+  plan: string; // e.g. "GBP / month"
+  daysLeft: number; // until trial_end
+}
+
 export interface StripeMetrics {
   status: SourceStatus;
   error?: string;
   mrr: number; // blended MRR in base currency (AUD): discounts + live FX applied
   mrrByCurrency: { currency: string; mrr: number }[]; // native per-currency, discount-adjusted
   activeSubscriptions: number; // paying subscriptions (excludes $0/free), matches Stripe
-  newCustomers: number; // created in range
+  newCustomers: number; // created in range = new signups/trials (customer is created at trial start)
+  paidConversions: number; // trials that converted to paid in range (active, trial_end in window)
+  trials: TrialAccount[]; // currently trialing accounts
   currency: string; // base currency code, e.g. "aud"
   previous: {
     newCustomers: number;

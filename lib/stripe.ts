@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import type { DateRange, StripeMetrics } from "./types";
+import type { DateRange, StripeMetrics, TrialAccount } from "./types";
 
 // Stripe. Needs a restricted, read-only secret key in env STRIPE_SECRET_KEY.
 // MRR is computed per subscription (tiered prices evaluated, coupon discounts
@@ -19,6 +19,8 @@ const EMPTY: StripeMetrics = {
   mrrByCurrency: [],
   activeSubscriptions: 0,
   newCustomers: 0,
+  paidConversions: 0,
+  trials: [],
   currency: BASE,
   previous: { newCustomers: 0 },
 };
@@ -137,8 +139,17 @@ export async function getStripeMetrics(
       return p;
     };
 
+    const startSec = Math.floor(
+      new Date(`${range.start}T00:00:00Z`).getTime() / 1000,
+    );
+    const prevStartSec = Math.floor(
+      new Date(`${prev.start}T00:00:00Z`).getTime() / 1000,
+    );
+    const nowSec = Math.floor(Date.now() / 1000);
+
     const nativeByCurrency: Record<string, number> = {};
     let activeSubscriptions = 0; // paying subscriptions, matches Stripe
+    let paidConversions = 0; // paying subs whose trial ended in range (trial → paid)
 
     for await (const sub of stripe.subscriptions.list({
       status: "active",
@@ -173,6 +184,10 @@ export async function getStripeMetrics(
       if (subMonthly > 0 && currency) {
         activeSubscriptions += 1;
         nativeByCurrency[currency] = (nativeByCurrency[currency] || 0) + subMonthly;
+        // Now-paying sub whose trial ended within the window = converted in range.
+        if (sub.trial_end && sub.trial_end >= startSec && sub.trial_end <= nowSec) {
+          paidConversions += 1;
+        }
       }
     }
 
@@ -187,12 +202,6 @@ export async function getStripeMetrics(
       blended += (minor / 100) * (rates[currency] ?? 0);
     }
 
-    const startSec = Math.floor(
-      new Date(`${range.start}T00:00:00Z`).getTime() / 1000,
-    );
-    const prevStartSec = Math.floor(
-      new Date(`${prev.start}T00:00:00Z`).getTime() / 1000,
-    );
     let newCustomers = 0;
     for await (const _c of stripe.customers.list({
       created: { gte: startSec },
@@ -212,12 +221,41 @@ export async function getStripeMetrics(
       prevNewCustomers += 1;
     }
 
+    // Currently trialing accounts — the live pipeline stage before paid (who to
+    // follow up with).
+    const trials: TrialAccount[] = [];
+    for await (const sub of stripe.subscriptions.list({
+      status: "trialing",
+      limit: 100,
+      expand: ["data.customer"],
+    })) {
+      const c = sub.customer;
+      const customer =
+        c && typeof c !== "string" && !(c as Stripe.DeletedCustomer).deleted
+          ? (c as Stripe.Customer)
+          : null;
+      const price = sub.items.data[0]?.price;
+      trials.push({
+        name: customer?.name || customer?.email || "(unknown)",
+        email: customer?.email || "",
+        plan: price
+          ? `${price.currency.toUpperCase()} / ${price.recurring?.interval ?? "—"}`
+          : "—",
+        daysLeft: sub.trial_end
+          ? Math.max(0, Math.round((sub.trial_end - nowSec) / 86400))
+          : 0,
+      });
+    }
+    trials.sort((a, b) => a.daysLeft - b.daysLeft); // soonest-ending first
+
     return {
       status: "ok",
       mrr: Math.round(blended * 100) / 100,
       mrrByCurrency,
       activeSubscriptions,
       newCustomers,
+      paidConversions,
+      trials,
       currency: BASE,
       previous: { newCustomers: prevNewCustomers },
     };
